@@ -1,110 +1,366 @@
-/**
- * CrossFit Link - Suivi Weightlifting
- * Google Apps Script - déployer comme Web App
- * Exécution : Moi | Accès : Tout le monde
- */
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CrossFit Link - Suivi weightlifting</title>
+<style>
+:root{
+  --bg:#F5F3EE; --ink:#1B1B19; --muted:#6B6862; --line:#DDD9CC; --card:#FFFFFF;
+  --snatch:#185FA5; --snatch-soft:#E6F1FB;
+  --cj:#993C1D;    --cj-soft:#FAECE7;
+  --trans:#0F6E56; --trans-soft:#E1F5EE;
+  --accent:#C1432B; --radius:14px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.page{max-width:460px;margin:0 auto;padding:20px 18px 60px;}
 
-const SHEET_NAME = 'Logs';
+/* Header */
+.eyebrow{font-weight:700;letter-spacing:.12em;font-size:11px;color:var(--accent);margin:0 0 2px;text-transform:uppercase;}
+h1{font-size:26px;font-weight:800;margin:0 0 3px;letter-spacing:-.02em;}
+.sub{margin:0 0 18px;color:var(--muted);font-size:14px;}
 
-function doGet(e) {
-  const p = e.parameter || {};
-  let result;
-  try {
-    switch (p.action) {
-      case 'write':  result = writeEntry(p);       break;
-      case 'read':   result = readAthlete(p.name); break;
-      case 'roster': result = getRoster();         break;
-      case 'all':    result = getAllData();         break;
-      default: result = { status: 'error', message: 'Action inconnue' };
+/* Config warning */
+.cfg-warn{background:#FEF3CD;border:1px solid #F0C040;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px;color:#7A5000;}
+
+/* Plates */
+.plates{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
+.plate{
+  flex:0 0 auto;width:56px;height:56px;border-radius:12px;border:2px solid var(--line);
+  background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-weight:700;font-size:13px;color:var(--muted);position:relative;cursor:pointer;
+  transition:transform .12s;user-select:none;
+}
+.plate:active{transform:scale(.94);}
+.dot{width:6px;height:6px;border-radius:50%;margin-top:3px;background:var(--line);}
+.plate.type-snatch{border-color:var(--snatch);color:var(--snatch);}
+.plate.type-cj{border-color:var(--cj);color:var(--cj);}
+.plate.type-transition{border-color:var(--trans);color:var(--trans);}
+.plate.filled.type-snatch{background:var(--snatch);color:#fff;}
+.plate.filled.type-cj{background:var(--cj);color:#fff;}
+.plate.filled.type-transition{background:var(--trans);color:#fff;}
+.plate.filled .dot{background:#fff;}
+.plate.today::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);}
+.plate.selected{box-shadow:0 0 0 3px rgba(0,0,0,.1);}
+
+/* Cards */
+.ctx-card{border-radius:var(--radius);padding:13px 15px;margin-bottom:14px;border:1px solid var(--line);}
+.ctx-card .label{font-weight:800;font-size:16px;margin:0 0 2px;}
+.ctx-card .meta{font-size:13px;margin:0;opacity:.85;}
+.form-card,.hist-card,.coach-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+
+/* Inputs */
+label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:14px;}
+input[type=text],input[type=number]{display:block;width:100%;margin-top:5px;padding:11px 12px;font-size:16px;border:1px solid var(--line);border-radius:10px;font-family:inherit;background:#fff;color:var(--ink);}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+.trans-note{font-size:14px;background:var(--trans-soft);color:#085041;padding:12px;border-radius:10px;margin-bottom:6px;}
+
+/* Buttons */
+.btn{width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;font-size:15px;letter-spacing:.01em;cursor:pointer;margin-top:6px;}
+.btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed;}
+.feedback{font-size:13px;margin:10px 0 0;min-height:16px;}
+.feedback.ok{color:#0F6E56;} .feedback.err{color:#993C1D;}
+
+/* History */
+.hist-card h2,.coach-card h2{font-size:15px;margin:0 0 10px;font-weight:800;}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;}
+.hist-row:last-child{border-bottom:none;}
+.tag{display:inline-flex;align-items:center;gap:6px;font-weight:700;}
+.swatch{width:8px;height:8px;border-radius:50%;}
+.empty{font-size:13px;color:var(--muted);}
+
+/* Coach */
+.link-btn{display:block;margin:0 auto 0;background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer;padding:8px;}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th,td{border:1px solid var(--line);padding:6px 4px;text-align:center;}
+th{font-weight:800;background:#FAF8F2;}
+.name-col{text-align:left;font-weight:700;}
+.cur-col{background:#FCEFE9;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="eyebrow">CrossFit Link</p>
+  <h1>Suivi weightlifting</h1>
+  <p class="sub">Cycle S22-S28 - Snatch & Clean and jerk</p>
+
+  <div id="cfgWarn" class="cfg-warn" hidden>
+    ⚙️ L'URL du script n'est pas encore configurée. Ouvre le fichier <code>index.html</code> et remplace <code>VOTRE_URL_ICI</code>.
+  </div>
+
+  <div class="plates" id="plateRow"></div>
+  <div class="ctx-card" id="ctxCard"></div>
+
+  <div class="form-card">
+    <label>Ton prénom
+      <input id="nameInput" list="rosterList" placeholder="ex. Camille" autocomplete="off"/>
+    </label>
+    <datalist id="rosterList"></datalist>
+    <div id="fieldsContainer"></div>
+    <button id="submitBtn" class="btn">Enregistrer</button>
+    <p id="feedback" class="feedback" aria-live="polite"></p>
+  </div>
+
+  <div class="hist-card">
+    <h2>Mon historique</h2>
+    <div id="histContent" class="empty">Entre ton prénom pour voir ton historique.</div>
+  </div>
+
+  <button class="link-btn" id="coachToggle">Vue coach - qui a rempli quoi</button>
+  <div class="coach-card" id="coachCard" hidden>
+    <h2>Vue d'ensemble</h2>
+    <div id="coachContent" class="empty">Chargement...</div>
+  </div>
+
+</div>
+<script>
+// ---- CONFIG ------------------------------------------------------------
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmZjO4RGcnk9gD3uQPR1Q5Qm91rMo3D5Y9gzcnKxeCicaR3xegtE3ibU9048zE5vd-/exec';
+
+// ---- WEEKS -------------------------------------------------------------
+const WEEKS = [
+  { id:'W1', start:'2026-06-24', type:'snatch', label:'Snatch',
+    target:'3RM squat snatch + 5 reps snatch pull @ 3RM',
+    fields:[
+      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch (kg)',           placeholder:'ex. 62.5'},
+      {key:'secondary', short:'Snatch pull',  label:'Snatch pull (kg) - 5 reps @ 3RM',              placeholder:'ex. 75'}
+    ]},
+  { id:'W2', start:'2026-07-01', type:'cj',     label:'Clean & jerk',
+    target:'3+1 reps complexe (front squat + split jerk) + push press 10RM',
+    fields:[
+      {key:'value',     short:'Complexe',    label:'Charge réalisée - complexe front squat + split jerk (kg)', placeholder:'ex. 70'},
+      {key:'secondary', short:'Push press',  label:'Push press (kg) - 10RM',                                   placeholder:'ex. 45'}
+    ]},
+  { id:'W3', start:'2026-07-08', type:'snatch', label:'Snatch',
+    target:'2RM squat snatch + 4 reps snatch pull @ 2RM',
+    fields:[
+      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch (kg)',  placeholder:'ex. 67.5'},
+      {key:'secondary', short:'Snatch pull',  label:'Snatch pull (kg) - 4 reps @ 2RM',     placeholder:'ex. 80'}
+    ]},
+  { id:'W4', start:'2026-07-15', type:'cj',     label:'Clean & jerk',
+    target:'2+1 reps complexe + push press 8RM',
+    fields:[
+      {key:'value',     short:'Complexe',   label:'Charge réalisée - complexe front squat + split jerk (kg)', placeholder:'ex. 75'},
+      {key:'secondary', short:'Push press', label:'Push press (kg) - 8RM',                                    placeholder:'ex. 48'}
+    ]},
+  { id:'W5', start:'2026-07-22', type:'snatch', label:'Snatch',
+    target:'1RM squat snatch + 3 reps snatch pull @ 1RM',
+    fields:[
+      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch (kg)',  placeholder:'ex. 72.5'},
+      {key:'secondary', short:'Snatch pull',  label:'Snatch pull (kg) - 3 reps @ 1RM',     placeholder:'ex. 85'}
+    ]},
+  { id:'W6', start:'2026-07-29', type:'cj',     label:'Clean & jerk',
+    target:'1+1 reps complexe + push press 6RM',
+    fields:[
+      {key:'value',     short:'Complexe',   label:'Charge réalisée - complexe front squat + split jerk (kg)', placeholder:'ex. 80'},
+      {key:'secondary', short:'Push press', label:'Push press (kg) - 6RM',                                    placeholder:'ex. 50'}
+    ]},
+  { id:'W7', start:'2026-08-05', type:'transition', label:'Transition',
+    target:'Barbell cycling - contenu à venir', fields:[] }
+];
+
+// ---- STATE -------------------------------------------------------------
+let selectedIdx = currentWeekIndex();
+let athleteData  = null; // {weeks: {W1:{value,secondary,ts}, ...}}
+
+// ---- UTILS -------------------------------------------------------------
+function currentWeekIndex() {
+  const now = new Date();
+  let idx = 0;
+  WEEKS.forEach((w, i) => { if (now >= new Date(w.start + 'T00:00:00')) idx = i; });
+  return idx;
+}
+function typeColor(type) {
+  return type === 'snatch' ? '#185FA5' : type === 'cj' ? '#993C1D' : '#0F6E56';
+}
+
+// ---- API (JSONP pour contourner les restrictions CORS d'Apps Script) ----
+function api(params) {
+  return new Promise(function(resolve, reject) {
+    if (SCRIPT_URL === 'VOTRE_URL_ICI') { reject(new Error('SCRIPT_URL non configurée')); return; }
+
+    var cbName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    var script = document.createElement('script');
+    var timeout = setTimeout(function() { cleanup(); reject(new Error('timeout')); }, 15000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      try { delete window[cbName]; } catch(e) { window[cbName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
-  } catch (err) {
-    result = { status: 'error', message: err.toString() };
-  }
 
-  const json = JSON.stringify(result);
-  // JSONP : si un callback est fourni, on renvoie du JavaScript exécutable
-  // (contourne les restrictions CORS des appels cross-domain)
-  if (p.callback) {
-    return ContentService
-      .createTextOutput(p.callback + '(' + json + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService
-    .createTextOutput(json)
-    .setMimeType(ContentService.MimeType.JSON);
+    window[cbName] = function(data) { cleanup(); resolve(data); };
+
+    var query = Object.assign({}, params, { callback: cbName });
+    script.src = SCRIPT_URL + '?' + new URLSearchParams(query).toString();
+    script.onerror = function() { cleanup(); reject(new Error('script error')); };
+    document.head.appendChild(script);
+  });
 }
 
-function getSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let s = ss.getSheetByName(SHEET_NAME);
-  if (!s) {
-    s = ss.insertSheet(SHEET_NAME);
-    s.appendRow(['Timestamp', 'Nom', 'Semaine', 'Main lift (kg)', 'Accessoire (kg)']);
-    s.setFrozenRows(1);
-  }
-  return s;
+async function loadRoster() {
+  try {
+    const d = await api({ action: 'roster' });
+    const list = document.getElementById('rosterList');
+    list.innerHTML = (d.names || []).map(n => `<option value="${n}"></option>`).join('');
+  } catch(e) { /* silencieux */ }
 }
 
-function writeEntry(p) {
-  getSheet().appendRow([
-    new Date().toISOString(),
-    (p.name || '').trim(),
-    p.week || '',
-    p.value !== undefined && p.value !== '' ? Number(p.value) : '',
-    p.secondary !== undefined && p.secondary !== '' ? Number(p.secondary) : ''
-  ]);
-  return { status: 'ok' };
+async function loadAthlete(name) {
+  if (!name.trim()) { athleteData = null; renderAll(); return; }
+  try {
+    athleteData = await api({ action: 'read', name: name.trim() });
+  } catch(e) {
+    athleteData = { weeks: {} };
+  }
+  renderAll();
 }
 
-function readAthlete(name) {
-  if (!name) return { status: 'error', message: 'Nom manquant' };
-  const rows = getSheet().getDataRange().getValues();
-  const key = name.trim().toLowerCase();
-  const weeks = {};
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if ((r[1] || '').toString().trim().toLowerCase() !== key) continue;
-    const wid = (r[2] || '').toString();
-    if (!wid) continue;
-    weeks[wid] = {
-      value:     r[3] !== '' ? r[3] : null,
-      secondary: r[4] !== '' ? r[4] : null,
-      ts:        r[0] ? r[0].toString() : ''
-    };
-  }
-  return { status: 'ok', name: name.trim(), weeks: weeks };
+// ---- RENDER ------------------------------------------------------------
+function renderPlates() {
+  const row = document.getElementById('plateRow');
+  const curIdx = currentWeekIndex();
+  row.innerHTML = '';
+  WEEKS.forEach((w, i) => {
+    const filled = athleteData && athleteData.weeks && athleteData.weeks[w.id];
+    const cls = ['plate', 'type-' + w.type,
+      filled ? 'filled' : '', i === selectedIdx ? 'selected' : '',
+      i === curIdx ? 'today' : ''].filter(Boolean).join(' ');
+    const el = document.createElement('div');
+    el.className = cls;
+    el.innerHTML = w.id + '<span class="dot"></span>';
+    el.addEventListener('click', () => { selectedIdx = i; renderAll(); });
+    row.appendChild(el);
+  });
 }
 
-function getRoster() {
-  const rows = getSheet().getDataRange().getValues();
-  const seen = {};
-  const names = [];
-  for (let i = 1; i < rows.length; i++) {
-    const name = (rows[i][1] || '').toString().trim();
-    const k = name.toLowerCase();
-    if (name && !seen[k]) { seen[k] = true; names.push(name); }
-  }
-  names.sort(function(a, b){ return a.localeCompare(b, 'fr'); });
-  return { status: 'ok', names: names };
+function renderContext() {
+  const w = document.getElementById('ctxCard');
+  const wk = WEEKS[selectedIdx];
+  w.style.background = wk.type === 'snatch' ? 'var(--snatch-soft)' : wk.type === 'cj' ? 'var(--cj-soft)' : 'var(--trans-soft)';
+  w.style.borderColor = typeColor(wk.type);
+  w.innerHTML = `<p class="label" style="color:${typeColor(wk.type)}">${wk.id} - ${wk.label}</p><p class="meta">Objectif : ${wk.target}</p>`;
 }
 
-function getAllData() {
-  const rows = getSheet().getDataRange().getValues();
-  const map = {};
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    const name = (r[1] || '').toString().trim();
-    if (!name) continue;
-    const k = name.toLowerCase();
-    const wid = (r[2] || '').toString();
-    if (!wid) continue;
-    if (!map[k]) map[k] = { name: name, weeks: {} };
-    map[k].weeks[wid] = {
-      value:     r[3] !== '' ? r[3] : null,
-      secondary: r[4] !== '' ? r[4] : null
-    };
+function renderFields() {
+  const wk  = WEEKS[selectedIdx];
+  const con = document.getElementById('fieldsContainer');
+  const btn = document.getElementById('submitBtn');
+  const existing = (athleteData && athleteData.weeks && athleteData.weeks[wk.id]) || {};
+
+  if (wk.fields.length === 0) {
+    con.innerHTML = `<p class="trans-note">Le contenu de cette semaine n'est pas encore défini. Rien à enregistrer.</p>`;
+    btn.style.display = 'none';
+    return;
   }
-  const athletes = Object.keys(map).map(function(k){ return map[k]; });
-  athletes.sort(function(a, b){ return a.name.localeCompare(b.name, 'fr'); });
-  return { status: 'ok', athletes: athletes };
+  btn.style.display = 'block';
+  con.innerHTML = wk.fields.map((f, i) => `
+    <label>${f.label}
+      <input type="number" inputmode="decimal" step="0.5" id="field-${i}"
+        value="${existing[f.key] != null ? existing[f.key] : ''}"
+        placeholder="${f.placeholder}"/>
+    </label>`).join('');
 }
+
+function renderHistory() {
+  const el  = document.getElementById('histContent');
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { el.className = 'empty'; el.textContent = 'Entre ton prénom pour voir ton historique.'; return; }
+  if (!athleteData || !athleteData.weeks || Object.keys(athleteData.weeks).length === 0) {
+    el.className = 'empty'; el.textContent = "Pas encore d'historique pour ce cycle."; return;
+  }
+  el.className = '';
+  el.innerHTML = WEEKS
+    .filter(w => w.fields.length > 0 && athleteData.weeks[w.id])
+    .map(w => {
+      const d = athleteData.weeks[w.id];
+      const vals = w.fields.map(f => d[f.key] != null ? `${f.short} : ${d[f.key]} kg` : null).filter(Boolean).join(' / ');
+      return `<div class="hist-row">
+        <span class="tag"><span class="swatch" style="background:${typeColor(w.type)}"></span>${w.id} - ${w.label}</span>
+        <span>${vals}</span>
+      </div>`;
+    }).join('');
+}
+
+function renderAll() {
+  renderPlates();
+  renderContext();
+  renderFields();
+  renderHistory();
+}
+
+// ---- EVENTS ------------------------------------------------------------
+document.getElementById('nameInput').addEventListener('change', e => loadAthlete(e.target.value));
+document.getElementById('nameInput').addEventListener('blur',   e => loadAthlete(e.target.value));
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const fb   = document.getElementById('feedback');
+  const name = document.getElementById('nameInput').value.trim();
+  const wk   = WEEKS[selectedIdx];
+
+  if (!name) { fb.className = 'feedback err'; fb.textContent = "Entre ton prénom avant d'enregistrer."; return; }
+  const first = document.getElementById('field-0');
+  if (!first || !first.value) { fb.className = 'feedback err'; fb.textContent = 'Indique au moins la charge principale.'; return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; fb.className = 'feedback'; fb.textContent = 'Enregistrement...';
+
+  const params = { action: 'write', name, week: wk.id };
+  wk.fields.forEach((f, i) => {
+    const inp = document.getElementById('field-' + i);
+    params[f.key] = inp && inp.value ? inp.value : '';
+  });
+
+  try {
+    await api(params);
+    fb.className = 'feedback ok'; fb.textContent = `Enregistré - ${wk.id} ${wk.label}.`;
+    await loadAthlete(name);
+    await loadRoster();
+  } catch(e) {
+    fb.className = 'feedback err'; fb.textContent = 'Erreur de connexion, réessaie dans un instant.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('coachToggle').addEventListener('click', async () => {
+  const card = document.getElementById('coachCard');
+  const con  = document.getElementById('coachContent');
+  card.hidden = !card.hidden;
+  if (card.hidden) return;
+
+  con.className = 'empty'; con.textContent = 'Chargement...';
+  try {
+    const d = await api({ action: 'all' });
+    if (!d.athletes || d.athletes.length === 0) {
+      con.textContent = "Personne n'a encore enregistré de résultat."; return;
+    }
+    const curIdx = currentWeekIndex();
+    let html = '<div class="table-wrap"><table><thead><tr><th class="name-col">Athlète</th>';
+    WEEKS.forEach((w, i) => html += `<th class="${i === curIdx ? 'cur-col' : ''}">${w.id}</th>`);
+    html += '</tr></thead><tbody>';
+    d.athletes.forEach(rec => {
+      html += `<tr><td class="name-col">${rec.name}</td>`;
+      WEEKS.forEach((w, i) => {
+        const ok = rec.weeks && rec.weeks[w.id] && rec.weeks[w.id].value != null;
+        html += `<td class="${i === curIdx ? 'cur-col' : ''}" style="${ok ? 'color:' + typeColor(w.type) + ';font-weight:700' : ''}">${ok ? '✓' : '-'}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    con.className = ''; con.innerHTML = html;
+  } catch(e) {
+    con.className = 'empty'; con.textContent = 'Impossible de charger les données.';
+  }
+});
+
+// ---- INIT --------------------------------------------------------------
+if (SCRIPT_URL === 'VOTRE_URL_ICI') document.getElementById('cfgWarn').hidden = false;
+else loadRoster();
+renderAll();
+</script>
+</body>
+</html>
