@@ -27,20 +27,20 @@ h1{font-size:26px;font-weight:800;margin:0 0 3px;letter-spacing:-.02em;}
 /* Plates */
 .plates{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
 .plate{
-  flex:0 0 auto;width:56px;height:56px;border-radius:12px;border:2px solid var(--line);
+  flex:0 0 auto;width:60px;height:60px;border-radius:12px;border:2px solid var(--line);
   background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;
-  font-weight:700;font-size:13px;color:var(--muted);position:relative;cursor:pointer;
+  color:var(--muted);position:relative;cursor:pointer;gap:1px;
   transition:transform .12s;user-select:none;
 }
 .plate:active{transform:scale(.94);}
-.dot{width:6px;height:6px;border-radius:50%;margin-top:3px;background:var(--line);}
+.plate-id{font-weight:800;font-size:14px;line-height:1.1;}
+.plate-scheme{font-weight:600;font-size:10px;line-height:1.1;opacity:.75;}
 .plate.type-snatch{border-color:var(--snatch);color:var(--snatch);}
 .plate.type-cj{border-color:var(--cj);color:var(--cj);}
 .plate.type-transition{border-color:var(--trans);color:var(--trans);}
 .plate.filled.type-snatch{background:var(--snatch);color:#fff;}
 .plate.filled.type-cj{background:var(--cj);color:#fff;}
 .plate.filled.type-transition{background:var(--trans);color:#fff;}
-.plate.filled .dot{background:#fff;}
 .plate.today::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);}
 .plate.selected{box-shadow:0 0 0 3px rgba(0,0,0,.1);}
 
@@ -81,6 +81,7 @@ th{font-weight:800;background:#FAF8F2;}
 .score-main{display:block;font-weight:800;font-size:13px;line-height:1.2;}
 .score-sec{display:block;font-size:10px;font-weight:600;opacity:.65;line-height:1.2;}
 .coach-legend{font-size:11px;color:var(--muted);margin:0 0 8px;}
+.th-scheme{display:block;font-size:10px;font-weight:600;opacity:.7;}
 </style>
 </head>
 <body>
@@ -98,8 +99,8 @@ th{font-weight:800;background:#FAF8F2;}
   <div class="ctx-card" id="ctxCard"></div>
 
   <div class="form-card">
-    <label>Ton prénom + initiale du nom
-      <input id="nameInput" list="rosterList" placeholder="ex. Camille D" autocomplete="off"/>
+    <label>Ton prénom et nom
+      <input id="nameInput" list="rosterList" placeholder="ex. Camille Dupont" autocomplete="off"/>
     </label>
     <datalist id="rosterList"></datalist>
     <div id="fieldsContainer"></div>
@@ -125,43 +126,43 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmZjO4RGcnk9gD3uQPR
 
 // ---- WEEKS -------------------------------------------------------------
 const WEEKS = [
-  { id:'W1', start:'2026-06-24', type:'snatch', label:'Snatch',
+  { id:'W1', start:'2026-06-24', type:'snatch', label:'Snatch', scheme:'3RM',
     target:'3RM squat snatch + 5 reps snatch pull @ 3RM',
     fields:[
-      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch (kg)',           placeholder:'ex. 62.5'},
+      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch 3RM (kg)',      placeholder:'ex. 62.5'},
       {key:'secondary', short:'Snatch pull',  label:'Snatch pull (kg) - 5 reps @ 3RM',              placeholder:'ex. 75'}
     ]},
-  { id:'W2', start:'2026-07-01', type:'cj',     label:'Clean & jerk',
+  { id:'W2', start:'2026-07-01', type:'cj',     label:'Clean & jerk', scheme:'3+1',
     target:'3+1 reps complexe (front squat + split jerk) + push press 10RM',
     fields:[
-      {key:'value',     short:'Complexe',    label:'Charge réalisée - complexe front squat + split jerk (kg)', placeholder:'ex. 70'},
-      {key:'secondary', short:'Push press',  label:'Push press (kg) - 10RM',                                   placeholder:'ex. 45'}
+      {key:'value',     short:'Complexe',    label:'Charge réalisée - complexe 3+1 (front squat + split jerk) (kg)', placeholder:'ex. 70'},
+      {key:'secondary', short:'Push press',  label:'Push press 10RM (kg)',                                   placeholder:'ex. 45'}
     ]},
-  { id:'W3', start:'2026-07-08', type:'snatch', label:'Snatch',
+  { id:'W3', start:'2026-07-08', type:'snatch', label:'Snatch', scheme:'2RM',
     target:'2RM squat snatch + 4 reps snatch pull @ 2RM',
     fields:[
-      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch (kg)',  placeholder:'ex. 67.5'},
+      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch 2RM (kg)',  placeholder:'ex. 67.5'},
       {key:'secondary', short:'Snatch pull',  label:'Snatch pull (kg) - 4 reps @ 2RM',     placeholder:'ex. 80'}
     ]},
-  { id:'W4', start:'2026-07-15', type:'cj',     label:'Clean & jerk',
+  { id:'W4', start:'2026-07-15', type:'cj',     label:'Clean & jerk', scheme:'2+1',
     target:'2+1 reps complexe + push press 8RM',
     fields:[
-      {key:'value',     short:'Complexe',   label:'Charge réalisée - complexe front squat + split jerk (kg)', placeholder:'ex. 75'},
-      {key:'secondary', short:'Push press', label:'Push press (kg) - 8RM',                                    placeholder:'ex. 48'}
+      {key:'value',     short:'Complexe',   label:'Charge réalisée - complexe 2+1 (front squat + split jerk) (kg)', placeholder:'ex. 75'},
+      {key:'secondary', short:'Push press', label:'Push press 8RM (kg)',                                    placeholder:'ex. 48'}
     ]},
-  { id:'W5', start:'2026-07-22', type:'snatch', label:'Snatch',
+  { id:'W5', start:'2026-07-22', type:'snatch', label:'Snatch', scheme:'1RM',
     target:'1RM squat snatch + 3 reps snatch pull @ 1RM',
     fields:[
-      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch (kg)',  placeholder:'ex. 72.5'},
+      {key:'value',     short:'Squat snatch', label:'Charge réalisée - squat snatch 1RM (kg)',  placeholder:'ex. 72.5'},
       {key:'secondary', short:'Snatch pull',  label:'Snatch pull (kg) - 3 reps @ 1RM',     placeholder:'ex. 85'}
     ]},
-  { id:'W6', start:'2026-07-29', type:'cj',     label:'Clean & jerk',
+  { id:'W6', start:'2026-07-29', type:'cj',     label:'Clean & jerk', scheme:'1+1',
     target:'1+1 reps complexe + push press 6RM',
     fields:[
-      {key:'value',     short:'Complexe',   label:'Charge réalisée - complexe front squat + split jerk (kg)', placeholder:'ex. 80'},
-      {key:'secondary', short:'Push press', label:'Push press (kg) - 6RM',                                    placeholder:'ex. 50'}
+      {key:'value',     short:'Complexe',   label:'Charge réalisée - complexe 1+1 (front squat + split jerk) (kg)', placeholder:'ex. 80'},
+      {key:'secondary', short:'Push press', label:'Push press 6RM (kg)',                                    placeholder:'ex. 50'}
     ]},
-  { id:'W7', start:'2026-08-05', type:'transition', label:'Transition',
+  { id:'W7', start:'2026-08-05', type:'transition', label:'Transition', scheme:'',
     target:'Barbell cycling - contenu à venir', fields:[] }
 ];
 
@@ -234,7 +235,7 @@ function renderPlates() {
       i === curIdx ? 'today' : ''].filter(Boolean).join(' ');
     const el = document.createElement('div');
     el.className = cls;
-    el.innerHTML = w.id + '<span class="dot"></span>';
+    el.innerHTML = '<span class="plate-id">' + w.id + '</span>' + (w.scheme ? '<span class="plate-scheme">' + w.scheme + '</span>' : '<span class="plate-scheme">&nbsp;</span>');
     el.addEventListener('click', () => { selectedIdx = i; renderAll(); });
     row.appendChild(el);
   });
@@ -282,7 +283,7 @@ function renderHistory() {
       const d = athleteData.weeks[w.id];
       const vals = w.fields.map(f => d[f.key] != null ? `${f.short} : ${d[f.key]} kg` : null).filter(Boolean).join(' / ');
       return `<div class="hist-row">
-        <span class="tag"><span class="swatch" style="background:${typeColor(w.type)}"></span>${w.id} - ${w.label}</span>
+        <span class="tag"><span class="swatch" style="background:${typeColor(w.type)}"></span>${w.id} - ${w.label}${w.scheme ? ' (' + w.scheme + ')' : ''}</span>
         <span>${vals}</span>
       </div>`;
     }).join('');
@@ -344,7 +345,7 @@ document.getElementById('coachToggle').addEventListener('click', async () => {
     const curIdx = currentWeekIndex();
     let html = '<p class="coach-legend">Grand chiffre : charge principale (kg) - petit chiffre : accessoire (kg).</p>';
     html += '<div class="table-wrap"><table><thead><tr><th class="name-col">Athlète</th>';
-    WEEKS.forEach((w, i) => html += `<th class="${i === curIdx ? 'cur-col' : ''}">${w.id}</th>`);
+    WEEKS.forEach((w, i) => html += `<th class="${i === curIdx ? 'cur-col' : ''}">${w.id}${w.scheme ? '<span class="th-scheme">' + w.scheme + '</span>' : ''}</th>`);
     html += '</tr></thead><tbody>';
     d.athletes.forEach(rec => {
       html += `<tr><td class="name-col">${rec.name}</td>`;
