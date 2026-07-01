@@ -177,13 +177,28 @@ function typeColor(type) {
   return type === 'snatch' ? '#185FA5' : type === 'cj' ? '#993C1D' : '#0F6E56';
 }
 
-// ---- API ---------------------------------------------------------------
-async function api(params) {
-  if (SCRIPT_URL === 'VOTRE_URL_ICI') throw new Error('SCRIPT_URL non configurée');
-  const url = SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-  const res  = await fetch(url, { redirect: 'follow' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+// ---- API (JSONP pour contourner les restrictions CORS d'Apps Script) ----
+function api(params) {
+  return new Promise(function(resolve, reject) {
+    if (SCRIPT_URL === 'VOTRE_URL_ICI') { reject(new Error('SCRIPT_URL non configurée')); return; }
+
+    var cbName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    var script = document.createElement('script');
+    var timeout = setTimeout(function() { cleanup(); reject(new Error('timeout')); }, 15000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      try { delete window[cbName]; } catch(e) { window[cbName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(data) { cleanup(); resolve(data); };
+
+    var query = Object.assign({}, params, { callback: cbName });
+    script.src = SCRIPT_URL + '?' + new URLSearchParams(query).toString();
+    script.onerror = function() { cleanup(); reject(new Error('script error')); };
+    document.head.appendChild(script);
+  });
 }
 
 async function loadRoster() {
