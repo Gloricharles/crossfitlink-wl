@@ -78,6 +78,9 @@ th,td{border:1px solid var(--line);padding:6px 4px;text-align:center;}
 th{font-weight:800;background:#FAF8F2;}
 .name-col{text-align:left;font-weight:700;}
 .cur-col{background:#FCEFE9;}
+.score-main{display:block;font-weight:800;font-size:13px;line-height:1.2;}
+.score-sec{display:block;font-size:10px;font-weight:600;opacity:.65;line-height:1.2;}
+.coach-legend{font-size:11px;color:var(--muted);margin:0 0 8px;}
 </style>
 </head>
 <body>
@@ -95,8 +98,8 @@ th{font-weight:800;background:#FAF8F2;}
   <div class="ctx-card" id="ctxCard"></div>
 
   <div class="form-card">
-    <label>Ton prénom
-      <input id="nameInput" list="rosterList" placeholder="ex. Camille" autocomplete="off"/>
+    <label>Ton prénom + initiale du nom
+      <input id="nameInput" list="rosterList" placeholder="ex. Camille D" autocomplete="off"/>
     </label>
     <datalist id="rosterList"></datalist>
     <div id="fieldsContainer"></div>
@@ -339,14 +342,21 @@ document.getElementById('coachToggle').addEventListener('click', async () => {
       con.textContent = "Personne n'a encore enregistré de résultat."; return;
     }
     const curIdx = currentWeekIndex();
-    let html = '<div class="table-wrap"><table><thead><tr><th class="name-col">Athlète</th>';
+    let html = '<p class="coach-legend">Grand chiffre : charge principale (kg) - petit chiffre : accessoire (kg).</p>';
+    html += '<div class="table-wrap"><table><thead><tr><th class="name-col">Athlète</th>';
     WEEKS.forEach((w, i) => html += `<th class="${i === curIdx ? 'cur-col' : ''}">${w.id}</th>`);
     html += '</tr></thead><tbody>';
     d.athletes.forEach(rec => {
       html += `<tr><td class="name-col">${rec.name}</td>`;
       WEEKS.forEach((w, i) => {
-        const ok = rec.weeks && rec.weeks[w.id] && rec.weeks[w.id].value != null;
-        html += `<td class="${i === curIdx ? 'cur-col' : ''}" style="${ok ? 'color:' + typeColor(w.type) + ';font-weight:700' : ''}">${ok ? '✓' : '-'}</td>`;
+        const d2 = rec.weeks && rec.weeks[w.id];
+        const has = d2 && d2.value != null;
+        let cell = '-';
+        if (has) {
+          cell = `<span class="score-main">${d2.value}</span>`;
+          if (d2.secondary != null) cell += `<span class="score-sec">${d2.secondary}</span>`;
+        }
+        html += `<td class="${i === curIdx ? 'cur-col' : ''}" style="${has ? 'color:' + typeColor(w.type) : ''}">${cell}</td>`;
       });
       html += '</tr>';
     });
