@@ -44,12 +44,22 @@ label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bot
 input[type=text],input[type=number]{display:block;width:100%;margin-top:5px;padding:11px 12px;font-size:16px;border:1px solid var(--line);border-radius:10px;font-family:inherit;background:#fff;color:var(--ink);}
 input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 .trans-note{font-size:14px;background:var(--trans-soft);color:#085041;padding:12px;border-radius:10px;margin-bottom:6px;}
-.backoff-hint{background:var(--snatch-soft);color:#0C447C;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.4;margin:-8px 0 14px;}
+.backoff-hint{border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.4;margin:-8px 0 14px;}
+.backoff-hint.snatch{background:var(--snatch-soft);color:#0C447C;}
+.backoff-hint.cj{background:var(--cj-soft);color:#712B13;}
 .btn{width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:800;font-size:15px;letter-spacing:.01em;cursor:pointer;margin-top:6px;}
 .btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed;}
 .feedback{font-size:13px;margin:10px 0 0;min-height:16px;}
 .feedback.ok{color:#0F6E56;} .feedback.err{color:#993C1D;}
 .hist-card h2,.coach-card h2{font-size:15px;margin:0 0 10px;font-weight:800;}
+.prog-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.prog-card h2{font-size:15px;margin:0 0 4px;font-weight:800;}
+.prog-h{font-size:13px;font-weight:700;color:var(--muted);margin:16px 0 0;}
+.prog-svg{width:100%;height:auto;display:block;margin-top:2px;}
+.prog-svg .pv{font-size:12px;font-weight:700;fill:var(--ink);font-family:inherit;}
+.prog-svg .pl{font-size:11px;fill:var(--muted);font-family:inherit;}
+.prog-note{font-size:13px;font-weight:700;margin:2px 0 0;}
+.prog-foot{font-size:11px;color:var(--muted);margin:14px 0 0;line-height:1.4;}
 .hist-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;gap:10px;}
 .hist-row:last-child{border-bottom:none;}
 .tag{display:inline-flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap;}
@@ -98,6 +108,11 @@ th{font-weight:800;background:#FAF8F2;}
     <div id="histContent" class="empty">Entre ton prénom pour voir ton historique.</div>
   </div>
 
+  <div class="prog-card">
+    <h2>Ma progression - 1RM estimé</h2>
+    <div id="progContent" class="empty">Entre ton prénom pour voir ta progression.</div>
+  </div>
+
   <button class="link-btn" id="coachToggle">Vue coach - qui a rempli quoi</button>
   <div class="coach-card" id="coachCard" hidden>
     <h2>Vue d'ensemble</h2>
@@ -115,8 +130,7 @@ const WEEKS = [
   { id:'W1', start:'2026-08-19', type:'cj', label:'Clean & jerk', scheme:'3RM',
     target:'3RM squat clean + split jerk + 5 reps clean pull @ 3RM',
     fields:[
-      {key:'value',     short:'SC+SJ',      label:'Charge - squat clean + split jerk 3RM (kg)', placeholder:'ex. 80'},
-      {key:'secondary', short:'Clean pull', label:'Clean pull (kg) - 5 reps @ 3RM',             placeholder:'ex. 95'}
+      {key:'value', short:'SC+SJ', label:'Charge - squat clean + split jerk 3RM (kg)', placeholder:'ex. 80', sameWeight:{reps:5, movement:'clean pull'}}
     ]},
   { id:'W2', start:'2026-08-26', type:'snatch', label:'Snatch', scheme:'1+3',
     target:'Max load : 1 hang power snatch + 3 overhead squat + OHS du sol 10RM',
@@ -127,8 +141,7 @@ const WEEKS = [
   { id:'W3', start:'2026-09-02', type:'cj', label:'Clean & jerk', scheme:'2RM',
     target:'2RM squat clean + split jerk + 4 reps clean pull @ 2RM',
     fields:[
-      {key:'value',     short:'SC+SJ',      label:'Charge - squat clean + split jerk 2RM (kg)', placeholder:'ex. 85'},
-      {key:'secondary', short:'Clean pull', label:'Clean pull (kg) - 4 reps @ 2RM',             placeholder:'ex. 100'}
+      {key:'value', short:'SC+SJ', label:'Charge - squat clean + split jerk 2RM (kg)', placeholder:'ex. 85', sameWeight:{reps:4, movement:'clean pull'}}
     ]},
   { id:'W4', start:'2026-09-09', type:'snatch', label:'Snatch', scheme:'1+2',
     target:'Max load : 1 hang power snatch + 2 overhead squat + OHS du sol 8RM',
@@ -139,8 +152,7 @@ const WEEKS = [
   { id:'W5', start:'2026-09-16', type:'cj', label:'Clean & jerk', scheme:'1RM',
     target:'1RM squat clean + split jerk + 3 reps clean pull @ 1RM',
     fields:[
-      {key:'value',     short:'SC+SJ',      label:'Charge - squat clean + split jerk 1RM (kg)', placeholder:'ex. 90'},
-      {key:'secondary', short:'Clean pull', label:'Clean pull (kg) - 3 reps @ 1RM',             placeholder:'ex. 105'}
+      {key:'value', short:'SC+SJ', label:'Charge - squat clean + split jerk 1RM (kg)', placeholder:'ex. 90', sameWeight:{reps:3, movement:'clean pull'}}
     ]},
   { id:'W6', start:'2026-09-23', type:'snatch', label:'Snatch', scheme:'1+1',
     target:'Max load : 1 hang power snatch + 1 overhead squat + OHS du sol 6RM',
@@ -171,6 +183,34 @@ function backoffRange(rm, pct) {
   const center = Math.round((rm * pct) / 2.5) * 2.5;
   return [center - 2.5, center + 2.5];
 }
+// 1RM estimé (Epley) - aligné sur le fichier d'équilibre. 1 rep = valeur mesurée.
+function est1RM(w, reps) {
+  if (!w || w <= 0) return null;
+  if (reps <= 1) return w;
+  return w * (1 + reps / 30);
+}
+// Tranche d'incertitude d'une estimation : ±5%, bornes arrondies à la plaque de 2,5 kg.
+// Un 1RM mesuré (reps<=1) n'a pas de tranche : borne basse = haute = valeur.
+function est1RMRange(w, reps) {
+  const e = est1RM(w, reps);
+  if (e == null) return null;
+  if (reps <= 1) return { mid: e, lo: e, hi: e, measured: true };
+  return {
+    mid: e,
+    lo: Math.round((e * 0.95) / 2.5) * 2.5,
+    hi: Math.round((e * 1.05) / 2.5) * 2.5,
+    measured: false
+  };
+}
+// Quelle série de progression, depuis quel champ, avec combien de reps (pour l'estimation 1RM)
+const PROG_MAP = {
+  W1: { series:'cj',  from:'value',     reps:3  },
+  W2: { series:'ohs', from:'secondary', reps:10 },
+  W3: { series:'cj',  from:'value',     reps:2  },
+  W4: { series:'ohs', from:'secondary', reps:8  },
+  W5: { series:'cj',  from:'value',     reps:1  },
+  W6: { series:'ohs', from:'secondary', reps:6  }
+};
 
 // ---- API (JSONP) -------------------------------------------------------
 function api(params) {
@@ -244,20 +284,26 @@ function renderFields() {
       <input type="number" inputmode="decimal" step="0.5" id="field-${i}"
         value="${existing[f.key] != null ? existing[f.key] : ''}"
         placeholder="${f.placeholder}"/>
-    </label>${f.backoff ? `<div class="backoff-hint" id="backoff-${i}" hidden></div>` : ''}`).join('');
+    </label>${(f.backoff || f.sameWeight) ? `<div class="backoff-hint ${wk.type}" id="hint-${i}" hidden></div>` : ''}`).join('');
 
   wk.fields.forEach((f, i) => {
-    if (!f.backoff) return;
+    if (!f.backoff && !f.sameWeight) return;
     const inp = document.getElementById('field-' + i);
-    const hint = document.getElementById('backoff-' + i);
+    const hint = document.getElementById('hint-' + i);
+    function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
     function update() {
-      const rm = parseFloat(inp.value);
-      if (!rm || rm <= 0) { hint.hidden = true; hint.innerHTML = ''; return; }
-      const r = backoffRange(rm, f.backoff.pct);
+      const v = parseFloat(inp.value);
+      if (!v || v <= 0) { hint.hidden = true; hint.innerHTML = ''; return; }
       hint.hidden = false;
-      hint.innerHTML = '2e bloc ' + f.backoff.movement + ' - 3 × ' + f.backoff.reps + ' reps à '
-        + Math.round(f.backoff.pct * 100) + '% : charge entre <strong>' + fmtKg(r[0])
-        + '</strong> et <strong>' + fmtKg(r[1]) + ' kg</strong>';
+      if (f.backoff) {
+        const r = backoffRange(v, f.backoff.pct);
+        hint.innerHTML = '2e bloc ' + f.backoff.movement + ' - 3 × ' + f.backoff.reps + ' reps à '
+          + Math.round(f.backoff.pct * 100) + '% : charge entre <strong>' + fmtKg(r[0])
+          + '</strong> et <strong>' + fmtKg(r[1]) + ' kg</strong>';
+      } else if (f.sameWeight) {
+        hint.innerHTML = cap(f.sameWeight.movement) + ' : ' + f.sameWeight.reps
+          + ' reps au même poids, soit <strong>' + fmtKg(v) + ' kg</strong>';
+      }
     }
     inp.addEventListener('input', update);
     update();
@@ -284,11 +330,96 @@ function renderHistory() {
     }).join('');
 }
 
+function progSvg(points, color) {
+  // points: [{label, mid, lo, hi, measured}]
+  if (points.length === 0) return '<p class="empty">Pas encore de données.</p>';
+  const W = 380, H = 158, padL = 24, padR = 22, padT = 28, padB = 24;
+  const allv = points.reduce((a, p) => a.concat([p.lo, p.hi, p.mid]), []);
+  let min = Math.min(...allv), max = Math.max(...allv);
+  if (min === max) { min -= 5; max += 5; } else { const m = (max - min) * 0.14; min -= m; max += m; }
+  const range = max - min, n = points.length;
+  const xAt = i => padL + (n === 1 ? (W - padL - padR) / 2 : i * (W - padL - padR) / (n - 1));
+  const yAt = v => padT + (1 - (v - min) / range) * (H - padT - padB);
+
+  // bande d'incertitude (aire entre lo et hi), seulement si au moins un point a une tranche
+  let band = '';
+  if (points.some(p => !p.measured)) {
+    let top = '', bot = '';
+    points.forEach((p, i) => {
+      const x = xAt(i).toFixed(1);
+      top += (i === 0 ? 'M' : 'L') + x + ' ' + yAt(p.hi).toFixed(1) + ' ';
+    });
+    for (let i = n - 1; i >= 0; i--) {
+      const x = xAt(i).toFixed(1);
+      bot += 'L' + x + ' ' + yAt(points[i].lo).toFixed(1) + ' ';
+    }
+    band = `<path d="${top}${bot}Z" fill="${color}" fill-opacity="0.13" stroke="none"/>`;
+  }
+
+  // ligne médiane
+  let mpath = '', dots = '';
+  const anchor = i => i === 0 ? 'start' : (i === n - 1 ? 'end' : 'middle');
+  points.forEach((p, i) => {
+    const x = xAt(i), y = yAt(p.mid), a = anchor(i);
+    mpath += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+    if (p.measured) {
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${color}"/>`;
+      dots += `<text x="${x.toFixed(1)}" y="${(y - 11).toFixed(1)}" text-anchor="${a}" class="pv">${fmtKg(p.mid)}</text>`;
+    } else {
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#fff" stroke="${color}" stroke-width="2"/>`;
+      dots += `<text x="${x.toFixed(1)}" y="${(yAt(p.hi) - 6).toFixed(1)}" text-anchor="${a}" class="pv">${fmtKg(p.lo)}-${fmtKg(p.hi)}</text>`;
+    }
+    dots += `<text x="${x.toFixed(1)}" y="${H - 7}" text-anchor="${a}" class="pl">${p.label}</text>`;
+  });
+  const line = n > 1 ? `<path d="${mpath}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" class="prog-svg">${band}${line}${dots}</svg>`;
+}
+
+function renderProgress() {
+  const wrap = document.getElementById('progContent');
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name || !athleteData || !athleteData.weeks || Object.keys(athleteData.weeks).length === 0) {
+    wrap.className = 'empty';
+    wrap.textContent = name ? "Pas encore de données pour ce cycle." : "Entre ton prénom pour voir ta progression.";
+    return;
+  }
+  wrap.className = '';
+  const cj = [], ohs = [];
+  WEEKS.forEach(w => {
+    const pm = PROG_MAP[w.id]; if (!pm) return;
+    const d = athleteData.weeks[w.id]; if (!d) return;
+    const r = est1RMRange(d[pm.from], pm.reps); if (r == null) return;
+    const pt = {
+      label: w.id,
+      mid: Math.round(r.mid * 10) / 10,
+      lo: Math.round(r.lo * 10) / 10,
+      hi: Math.round(r.hi * 10) / 10,
+      measured: r.measured
+    };
+    (pm.series === 'cj' ? cj : ohs).push(pt);
+  });
+
+  function deltaLine(pts, color) {
+    if (pts.length < 2) return '';
+    // progression comparée sur les médianes, entre première et dernière semaine disponibles
+    const d = pts[pts.length - 1].mid - pts[0].mid;
+    const pct = Math.round(d / pts[0].mid * 1000) / 10;
+    return `<p class="prog-note" style="color:${color}">${d >= 0 ? '+' : ''}${fmtKg(d)} kg (${pct >= 0 ? '+' : ''}${pct}%) de ${pts[0].label} à ${pts[pts.length - 1].label}, sur les valeurs médianes</p>`;
+  }
+
+  let html = '';
+  html += '<p class="prog-h">Clean & jerk</p>' + progSvg(cj, '#993C1D') + deltaLine(cj, '#993C1D');
+  html += '<p class="prog-h">Overhead squat</p>' + progSvg(ohs, '#185FA5') + deltaLine(ohs, '#185FA5');
+  html += '<p class="prog-foot">1RM estimé (formule d\'Epley), affiché en tranche ±5% car c\'est une estimation, pas une mesure. Le 1RM de C&J en W5 est mesuré (heavy single) : point net, sans tranche. À lire comme une tendance, pas comme un maxi certifié.</p>';
+  wrap.innerHTML = html;
+}
+
 function renderAll() {
   renderPlates();
   renderContext();
   renderFields();
   renderHistory();
+  renderProgress();
 }
 
 // ---- EVENTS ------------------------------------------------------------
