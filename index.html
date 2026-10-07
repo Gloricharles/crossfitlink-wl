@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CrossFit Link - Charges du jour (W38-W43)</title>
+<style>
+:root{
+  --bg:#F5F3EE; --ink:#1B1B19; --muted:#6B6862; --line:#DDD9CC; --card:#FFFFFF;
+  --snatch:#185FA5; --snatch-soft:#E6F1FB;
+  --cj:#993C1D;    --cj-soft:#FAECE7;
+  --accent:#C1432B; --radius:14px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.page{max-width:460px;margin:0 auto;padding:20px 18px 60px;}
+.eyebrow{font-weight:700;letter-spacing:.12em;font-size:11px;color:var(--accent);margin:0 0 2px;text-transform:uppercase;}
+h1{font-size:25px;font-weight:800;margin:0 0 3px;letter-spacing:-.02em;}
+.sub{margin:0 0 18px;color:var(--muted);font-size:14px;}
+.cfg-warn{background:#FEF3CD;border:1px solid #F0C040;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px;color:#7A5000;}
+.plates{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
+.plate{
+  flex:0 0 auto;width:60px;height:60px;border-radius:12px;border:2px solid var(--line);
+  background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--muted);position:relative;cursor:pointer;gap:1px;transition:transform .12s;user-select:none;
+}
+.plate:active{transform:scale(.94);}
+.plate-id{font-weight:800;font-size:14px;line-height:1.1;}
+.plate-scheme{font-weight:600;font-size:10px;line-height:1.1;opacity:.75;}
+.plate.type-snatch{border-color:var(--snatch);color:var(--snatch);}
+.plate.type-cj{border-color:var(--cj);color:var(--cj);}
+.plate.type-snatch.sel{background:var(--snatch);color:#fff;}
+.plate.type-cj.sel{background:var(--cj);color:#fff;}
+.plate.today::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);}
+.ctx-card{border-radius:var(--radius);padding:13px 15px;margin-bottom:14px;border:1px solid var(--line);}
+.ctx-card .label{font-weight:800;font-size:16px;margin:0 0 2px;}
+.ctx-card .meta{font-size:13px;margin:0;opacity:.9;white-space:pre-line;}
+.form-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:12px;}
+input[type=text],input[type=number]{display:block;width:100%;margin-top:5px;padding:11px 12px;font-size:16px;border:1px solid var(--line);border-radius:10px;font-family:inherit;background:#fff;color:var(--ink);}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+
+/* bloc charge du jour */
+.load-card{border-radius:var(--radius);padding:16px;margin-top:4px;border:1px solid var(--line);}
+.load-card.snatch{background:var(--snatch-soft);border-color:var(--snatch);}
+.load-card.cj{background:var(--cj-soft);border-color:var(--cj);}
+.load-ref{font-size:13px;color:var(--muted);margin:0 0 10px;}
+.load-ref strong{color:var(--ink);}
+.zone{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid rgba(0,0,0,.07);}
+.zone:last-child{border-bottom:none;}
+.zone-pct{font-size:13px;font-weight:700;}
+.zone-kg{font-size:17px;font-weight:800;}
+.zone.snatch .zone-pct,.zone.snatch .zone-kg{color:#0C447C;}
+.zone.cj .zone-pct,.zone.cj .zone-kg{color:#712B13;}
+.load-missing{font-size:13px;line-height:1.5;}
+.editref{margin-top:12px;}
+.editref summary{font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;}
+.editref .row{display:flex;gap:8px;align-items:flex-end;margin-top:8px;}
+.editref .row > div{flex:1;}
+.editref button{padding:11px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;}
+.hint{font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.4;}
+.name-empty{font-size:13px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="eyebrow">CrossFit Link</p>
+  <h1>Charges du jour</h1>
+  <p class="sub">Cycle W38-W43 - en % de ton 1RM</p>
+
+  <div id="cfgWarn" class="cfg-warn" hidden>⚙️ URL du script non configurée dans index.html.</div>
+
+  <div class="plates" id="plateRow"></div>
+  <div class="ctx-card" id="ctxCard"></div>
+
+  <div class="form-card">
+    <label>Ton prénom et nom
+      <input id="nameInput" list="rosterList" placeholder="ex. Camille Dupont" autocomplete="off"/>
+    </label>
+    <datalist id="rosterList"></datalist>
+    <div id="loadBox"><p class="name-empty">Entre ton prénom pour voir tes charges.</p></div>
+  </div>
+
+</div>
+<script>
+// ---- CONFIG ------------------------------------------------------------
+const SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbzmZjO4RGcnk9gD3uQPR1Q5Qm91rMo3D5Y9gzcnKxeCicaR3xegtE3ibU9048zE5vd-/exec';
+const SHEET_TAB   = 'Cycle_W38-43';   // onglet de ce cycle (ajustements manuels de 1RM)
+const SOURCE_TAB  = 'Cycle_S31-36';   // onglet du cycle précédent, où sont les 1RM testés
+const REF_CJ_WEEK     = 'W5';   // 1RM C&J testé dans l'onglet source
+const REF_SNATCH_WEEK = 'W6';   // repère snatch (complexe) dans l'onglet source - voir note
+
+// ---- WEEKS -------------------------------------------------------------
+// Chaque semaine : type (cj|snatch), schéma de %, et la liste des zones de travail.
+const WEEKS = [
+  { id:'W1', cal:'W38', start:'2026-10-07', type:'cj', label:'Clean & jerk',
+    scheme:'60-70%',
+    desc:'EMOM hang / low hang / power clean, puis jerks\n@ 60-70% du 1RM C&J',
+    zones:[[0.60,0.70]] },
+  { id:'W2', cal:'W39', start:'2026-10-14', type:'snatch', label:'Snatch',
+    scheme:'60-70%',
+    desc:'EMOM snatch balance, puis squat snatch\n@ 60-70% du 1RM snatch',
+    zones:[[0.60,0.70]] },
+  { id:'W3', cal:'W40', start:'2026-10-21', type:'cj', label:'Clean & jerk',
+    scheme:'70-80%',
+    desc:'EMOM hang / low hang / power clean, puis jerks\n@ 70-80% du 1RM C&J',
+    zones:[[0.70,0.80]] },
+  { id:'W4', cal:'W41', start:'2026-10-28', type:'snatch', label:'Snatch',
+    scheme:'70-80%',
+    desc:'EMOM snatch balance, puis squat snatch\n@ 70-80% du 1RM snatch',
+    zones:[[0.70,0.80]] },
+  { id:'W5', cal:'W42', start:'2026-11-04', type:'cj', label:'Clean & jerk',
+    scheme:'80-90%',
+    desc:'EMOM hang / low hang / power clean, puis jerks\n@ 80-90% du 1RM C&J',
+    zones:[[0.80,0.90]] },
+  { id:'W6', cal:'W43', start:'2026-11-11', type:'snatch', label:'Snatch',
+    scheme:'70-80%',
+    desc:'EMOM snatch balance, puis squat snatch\n@ 70-80% du 1RM snatch',
+    zones:[[0.70,0.80]] }
+];
+
+// ---- STATE -------------------------------------------------------------
+let selectedIdx = currentWeekIndex();
+let refs = { cj:null, snatch:null, overrides:{} }; // 1RM de référence + ajustements manuels
+
+// ---- UTILS -------------------------------------------------------------
+function currentWeekIndex() {
+  const now = new Date();
+  let idx = 0;
+  WEEKS.forEach((w, i) => { if (now >= new Date(w.start + 'T00:00:00')) idx = i; });
+  return idx;
+}
+function typeColor(t){ return t === 'snatch' ? '#185FA5' : '#993C1D'; }
+function fmtKg(n){ return (Math.round(n*10)/10).toString().replace('.', ','); }
+function roundPlate(n){ return Math.round(n/2.5)*2.5; } // arrondi à la plaque de 2,5 kg
+
+// ---- API (JSONP) -------------------------------------------------------
+function api(params) {
+  return new Promise(function(resolve, reject) {
+    if (SCRIPT_URL === 'VOTRE_URL_ICI') { reject(new Error('URL non configurée')); return; }
+    var cb = 'jsonp_' + Date.now() + '_' + Math.floor(Math.random()*1e5);
+    var s = document.createElement('script');
+    var to = setTimeout(function(){ cleanup(); reject(new Error('timeout')); }, 15000);
+    function cleanup(){ clearTimeout(to); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    window[cb] = function(d){ cleanup(); resolve(d); };
+    var q = Object.assign({}, params, { callback: cb });
+    s.src = SCRIPT_URL + '?' + new URLSearchParams(q).toString();
+    s.onerror = function(){ cleanup(); reject(new Error('script error')); };
+    document.head.appendChild(s);
+  });
+}
+
+async function loadRoster() {
+  try {
+    // roster combiné : athlètes du cycle source (pour retrouver leur 1RM) + de ce cycle
+    const [src, cur] = await Promise.all([
+      api({ action:'roster', sheet: SOURCE_TAB }),
+      api({ action:'roster', sheet: SHEET_TAB })
+    ]);
+    const set = {}; const names = [];
+    (src.names||[]).concat(cur.names||[]).forEach(function(n){
+      const k = n.toLowerCase(); if(!set[k]){ set[k]=1; names.push(n); }
+    });
+    names.sort(function(a,b){ return a.localeCompare(b,'fr'); });
+    document.getElementById('rosterList').innerHTML = names.map(function(n){ return '<option value="'+n+'"></option>'; }).join('');
+  } catch(e) {}
+}
+
+async function loadRefs(name) {
+  refs = { cj:null, snatch:null, overrides:{} };
+  const nm = name.trim();
+  if (!nm) { renderLoad(); return; }
+  try {
+    // 1RM de référence depuis le cycle précédent
+    const src = await api({ action:'maxes', name:nm, source:SOURCE_TAB, weeks: REF_CJ_WEEK + ',' + REF_SNATCH_WEEK });
+    if (src.maxes) {
+      if (src.maxes[REF_CJ_WEEK]     != null) refs.cj     = src.maxes[REF_CJ_WEEK];
+      if (src.maxes[REF_SNATCH_WEEK] != null) refs.snatch = src.maxes[REF_SNATCH_WEEK];
+    }
+    // ajustements manuels éventuels saisis dans ce cycle (onglet courant)
+    // stockés en "Semaine" = REF-CJ / REF-SNATCH, Main lift = la valeur
+    const cur = await api({ action:'read', name:nm, sheet:SHEET_TAB });
+    if (cur.weeks) {
+      if (cur.weeks['REF-CJ']     && cur.weeks['REF-CJ'].value     != null) refs.overrides.cj     = cur.weeks['REF-CJ'].value;
+      if (cur.weeks['REF-SNATCH'] && cur.weeks['REF-SNATCH'].value != null) refs.overrides.snatch = cur.weeks['REF-SNATCH'].value;
+    }
+  } catch(e) {}
+  renderLoad();
+}
+
+function effectiveRef(type) {
+  if (type === 'snatch') return refs.overrides.snatch != null ? refs.overrides.snatch : refs.snatch;
+  return refs.overrides.cj != null ? refs.overrides.cj : refs.cj;
+}
+
+// ---- RENDER ------------------------------------------------------------
+function renderPlates() {
+  const row = document.getElementById('plateRow');
+  const cur = currentWeekIndex();
+  row.innerHTML = '';
+  WEEKS.forEach(function(w, i) {
+    const cls = ['plate','type-'+w.type, i===selectedIdx?'sel':'', i===cur?'today':''].filter(Boolean).join(' ');
+    const el = document.createElement('div');
+    el.className = cls;
+    el.innerHTML = '<span class="plate-id">'+w.cal+'</span><span class="plate-scheme">'+w.scheme+'</span>';
+    el.addEventListener('click', function(){ selectedIdx = i; renderPlates(); renderContext(); renderLoad(); });
+    row.appendChild(el);
+  });
+}
+
+function renderContext() {
+  const el = document.getElementById('ctxCard');
+  const w = WEEKS[selectedIdx];
+  el.style.background = w.type==='snatch' ? 'var(--snatch-soft)' : 'var(--cj-soft)';
+  el.style.borderColor = typeColor(w.type);
+  el.innerHTML = '<p class="label" style="color:'+typeColor(w.type)+'">'+w.cal+' - '+w.label+' ('+w.scheme+')</p><p class="meta">'+w.desc+'</p>';
+}
+
+function zoneRow(pct, ref, type) {
+  const lo = roundPlate(pct[0]*ref), hi = roundPlate(pct[1]*ref);
+  const pctTxt = Math.round(pct[0]*100) + '-' + Math.round(pct[1]*100) + '%';
+  return '<div class="zone '+type+'"><span class="zone-pct">'+pctTxt+'</span><span class="zone-kg">'+fmtKg(lo)+' - '+fmtKg(hi)+' kg</span></div>';
+}
+
+function renderLoad() {
+  const box = document.getElementById('loadBox');
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { box.innerHTML = '<p class="name-empty">Entre ton prénom pour voir tes charges.</p>'; return; }
+
+  const w = WEEKS[selectedIdx];
+  const ref = effectiveRef(w.type);
+  const refLabel = w.type === 'snatch' ? '1RM snatch' : '1RM clean & jerk';
+
+  let html = '<div class="load-card '+w.type+'">';
+  if (ref != null && ref > 0) {
+    html += '<p class="load-ref">'+refLabel+' de référence : <strong>'+fmtKg(ref)+' kg</strong></p>';
+    html += w.zones.map(function(z){ return zoneRow(z, ref, w.type); }).join('');
+  } else {
+    html += '<p class="load-missing">Pas de '+refLabel+' trouvé automatiquement pour toi. Entre-le une fois ci-dessous pour voir tes charges du jour.</p>';
+  }
+
+  // édition manuelle du 1RM de référence (toujours dispo)
+  html += '<details class="editref"'+(ref!=null?'':' open')+'>';
+  html += '<summary>'+(ref!=null?'Ajuster mon '+refLabel:'Entrer mon '+refLabel)+'</summary>';
+  html += '<div class="row"><div><input type="number" inputmode="decimal" step="0.5" id="refInput" value="'+(ref!=null?ref:'')+'" placeholder="1RM en kg"/></div><button id="refBtn">Valider</button></div>';
+  html += '<p class="hint">Enregistré pour ce cycle. Ton 1RM vient par défaut du test du cycle précédent ('+(w.type==='snatch'?REF_SNATCH_WEEK:REF_CJ_WEEK)+').</p>';
+  html += '</details>';
+
+  // aide à l'estimation pour qui ne connaît pas son 1RM (débutants, nouveaux)
+  html += '<details class="editref">';
+  html += '<summary>Je ne connais pas mon 1RM - l\'estimer</summary>';
+  html += '<div class="row"><div><label style="margin:0">Charge (kg)<input type="number" inputmode="decimal" step="0.5" id="estW" placeholder="ex. 50"/></label></div>'
+        + '<div><label style="margin:0">en combien de reps ?<input type="number" inputmode="numeric" min="1" max="10" id="estR" placeholder="ex. 5"/></label></div></div>';
+  html += '<div class="row"><div><input type="text" id="estOut" readonly placeholder="1RM estimé -"/></div><button id="estBtn">Utiliser</button></div>';
+  html += '<p class="hint">Estimation Epley sur une charge récente propre (reps non maximales, technique maîtrisée). Indicatif : pour un débutant, mieux vaut partir léger et ajuster. Sur un mouvement encore instable, l\'estimation n\'a pas de sens - demande au coach.</p>';
+  html += '</details>';
+
+  html += '</div>';
+  box.innerHTML = html;
+
+  const btn = document.getElementById('refBtn');
+  if (btn) btn.addEventListener('click', saveRef);
+  wireEstimator();
+}
+
+// Estimateur 1RM (Epley) pour les athlètes sans max connu
+function wireEstimator() {
+  const wIn = document.getElementById('estW');
+  const rIn = document.getElementById('estR');
+  const out = document.getElementById('estOut');
+  const btn = document.getElementById('estBtn');
+  if (!wIn || !rIn || !out || !btn) return;
+  function calc() {
+    const wv = parseFloat(wIn.value), rv = parseInt(rIn.value, 10);
+    if (!wv || wv <= 0 || !rv || rv < 1) { out.value = ''; out.dataset.e1rm = ''; return null; }
+    const e = rv <= 1 ? wv : wv * (1 + rv / 30);
+    const r = roundPlate(e);
+    out.value = '1RM estimé : ' + fmtKg(r) + ' kg';
+    out.dataset.e1rm = r;
+    return r;
+  }
+  wIn.addEventListener('input', calc);
+  rIn.addEventListener('input', calc);
+  btn.addEventListener('click', async function() {
+    const r = calc();
+    if (!r) return;
+    const name = document.getElementById('nameInput').value.trim();
+    const w = WEEKS[selectedIdx];
+    if (!name) return;
+    const weekTag = w.type === 'snatch' ? 'REF-SNATCH' : 'REF-CJ';
+    btn.disabled = true; btn.textContent = '...';
+    try {
+      await api({ action:'write', sheet:SHEET_TAB, name:name, week:weekTag, value:r });
+      if (w.type === 'snatch') refs.overrides.snatch = r; else refs.overrides.cj = r;
+    } catch(e) {}
+    renderLoad();
+  });
+}
+
+async function saveRef() {
+  const name = document.getElementById('nameInput').value.trim();
+  const w = WEEKS[selectedIdx];
+  const inp = document.getElementById('refInput');
+  const val = inp ? parseFloat(inp.value) : null;
+  if (!name || !val || val <= 0) return;
+  const weekTag = w.type === 'snatch' ? 'REF-SNATCH' : 'REF-CJ';
+  const btn = document.getElementById('refBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    await api({ action:'write', sheet:SHEET_TAB, name:name, week:weekTag, value:val });
+    if (w.type === 'snatch') refs.overrides.snatch = val; else refs.overrides.cj = val;
+  } catch(e) {}
+  renderLoad();
+}
+
+// ---- EVENTS ------------------------------------------------------------
+document.getElementById('nameInput').addEventListener('change', function(e){ loadRefs(e.target.value); });
+document.getElementById('nameInput').addEventListener('blur',   function(e){ loadRefs(e.target.value); });
+
+// ---- INIT --------------------------------------------------------------
+if (SCRIPT_URL === 'VOTRE_URL_ICI') document.getElementById('cfgWarn').hidden = false;
+else loadRoster();
+renderPlates();
+renderContext();
+renderLoad();
+</script>
+</body>
+</html>
