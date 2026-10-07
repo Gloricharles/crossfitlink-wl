@@ -60,6 +60,11 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px;}
 .editref button{padding:11px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;}
 .hint{font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.4;}
 .name-empty{font-size:13px;color:var(--muted);}
+.share{margin-top:20px;text-align:center;}
+.share summary{font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline;}
+#qrbox{display:flex;justify-content:center;margin:16px 0 8px;min-height:10px;}
+#qrbox img,#qrbox canvas{border-radius:8px;background:#fff;padding:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.share-url{font-size:12px;color:var(--muted);word-break:break-all;margin:0;}
 </style>
 </head>
 <body>
@@ -81,6 +86,12 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px;}
     <datalist id="rosterList"></datalist>
     <div id="loadBox"><p class="name-empty">Entre ton prénom pour voir tes charges.</p></div>
   </div>
+
+  <details class="share" id="shareDetails">
+    <summary>Partager cette page (QR code)</summary>
+    <div id="qrbox"></div>
+    <p class="share-url" id="shareUrl"></p>
+  </details>
 
 </div>
 <script>
@@ -318,12 +329,38 @@ async function saveRef() {
 document.getElementById('nameInput').addEventListener('change', function(e){ loadRefs(e.target.value); });
 document.getElementById('nameInput').addEventListener('blur',   function(e){ loadRefs(e.target.value); });
 
+// ---- PARTAGE (QR code de la page elle-même) ----------------------------
+function initShare() {
+  const det = document.getElementById('shareDetails');
+  const box = document.getElementById('qrbox');
+  const urlP = document.getElementById('shareUrl');
+  const url = window.location.origin + window.location.pathname;
+  urlP.textContent = url;
+  let done = false;
+  function render() {
+    box.innerHTML = '';
+    try { new QRCode(box, { text:url, width:190, height:190, correctLevel: QRCode.CorrectLevel.M }); }
+    catch(e) { box.innerHTML = '<p class="share-url">QR indisponible - copie l\'adresse ci-dessous.</p>'; }
+  }
+  det.addEventListener('toggle', function() {
+    if (!det.open || done) return;
+    done = true;
+    if (window.QRCode) { render(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = render;
+    s.onerror = function(){ box.innerHTML = '<p class="share-url">QR indisponible hors ligne - copie l\'adresse ci-dessous ou génère un QR depuis celle-ci.</p>'; };
+    document.head.appendChild(s);
+  });
+}
+
 // ---- INIT --------------------------------------------------------------
 if (SCRIPT_URL === 'VOTRE_URL_ICI') document.getElementById('cfgWarn').hidden = false;
 else loadRoster();
 renderPlates();
 renderContext();
 renderLoad();
+initShare();
 </script>
 </body>
 </html>
